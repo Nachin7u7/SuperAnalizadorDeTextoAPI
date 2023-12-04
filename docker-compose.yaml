@@ -1,0 +1,10 @@
+version: "3"
+services:
+  fastapi-app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - spacy-model
+  spacy-model:
+    image: "your-spacy-model-image:latest"

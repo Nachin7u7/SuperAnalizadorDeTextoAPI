@@ -4,14 +4,18 @@ import time
 import pandas as pd
 from transformers import pipeline
 import spacy
+import openai
 
 app = FastAPI()
+
 
 class SentimentInput(BaseModel):
     text: str
 
+
 class AnalysisInput(BaseModel):
     text: str
+
 
 models_info = {
     "sentiment": {"name": "Sentiment Analysis Model", "type": "NLP"},
@@ -20,15 +24,18 @@ models_info = {
 
 inference_reports = []
 
+
 @app.get("/status")
 def read_status():
     return {"service": "Running", "models": models_info}
+
 
 @app.post("/sentiment")
 def analyze_sentiment(input_data: SentimentInput):
     start_time = time.time()
 
-    sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+    sentiment_analyzer = pipeline(
+        'sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
 
     result = sentiment_analyzer(input_data.text)
     sentiment_value = result[0]['score']
@@ -45,7 +52,9 @@ def analyze_sentiment(input_data: SentimentInput):
 
     return response_data
 
+
 nlp_model = spacy.load("en_core_web_sm")
+
 
 @app.post("/analysis")
 def analyze_text(input_data: AnalysisInput):
@@ -53,9 +62,11 @@ def analyze_text(input_data: AnalysisInput):
 
     doc = nlp_model(input_data.text)
     pos_tags = [token.pos_ for token in doc]
-    ner_entities = [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
+    ner_entities = [{"text": ent.text, "label": ent.label_}
+                    for ent in doc.ents]
 
-    sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+    sentiment_analyzer = pipeline(
+        'sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
     sentiment_result = sentiment_analyzer(input_data.text)
     sentiment_value = sentiment_result[0]['score']
 
@@ -78,6 +89,7 @@ def analyze_text(input_data: AnalysisInput):
 
     return response_data
 
+
 @app.get("/reports")
 def generate_reports():
 
@@ -87,32 +99,54 @@ def generate_reports():
 
     return {"csv_data": csv_data}
 
+
 class AnalysisV2Input(BaseModel):
     text: str
     prompt: str
 
-# @app.post("/analysis_v2")
-# def analyze_text_v2(input_data: AnalysisV2Input):
-#     start_time = time.time()
 
-#     pos_tags = ["NOUN", "VERB", "ADJ"]
-#     ner_entities = [{"text": "Apple", "label": "ORG"}]
-#     sentiment_prompt = 0.8
-#     lm_output = "Generated text from LLM"
-#     execution_time = time.time() - start_time
+openai.api_key = "KEYYYYYY" ## NOTA PARA MI MISMO --- > quitar esto para subirlo
 
-#     response_data = {
-#         "pos_tags": pos_tags,
-#         "ner_entities": ner_entities,
-#         "sentiment_prompt": sentiment_prompt,
-#         "lm_output": lm_output,
-#         "execution_time": execution_time,
-#         "model_info": {"name": "Combined Analysis Model", "type": "NLP"},
-#     }
 
-#     inference_reports.append(response_data)
+class AnalysisV2Input(BaseModel):
+    text: str
+    prompt: str
 
-#     return response_data
+
+@app.post("/analysis_v2")
+def analyze_text_v2(input_data: AnalysisV2Input):
+    start_time = time.time()
+
+    # POS tagging y NER
+    doc = nlp_model(input_data.text)
+    pos_tags = [token.pos_ for token in doc]
+    ner_entities = [{"text": ent.text, "label": ent.label_}
+                    for ent in doc.ents]
+
+    sentiment_prompt = 0.8
+
+    lm_response = openai.Completion.create(
+        model="gpt-3.5-turbo",
+        prompt=input_data.text,
+        max_tokens=150,
+    )
+    lm_output = lm_response["choices"][0]["text"]
+
+    execution_time = time.time() - start_time
+
+    response_data = {
+        "pos_tags": pos_tags,
+        "ner_entities": ner_entities,
+        "sentiment_prompt": sentiment_prompt,
+        "lm_output": lm_output,
+        "execution_time": execution_time,
+        "model_info": {"name": "Combined Analysis Model", "type": "NLP"},
+    }
+
+    inference_reports.append(response_data)
+
+    return response_data
+
 
 if __name__ == "__main__":
     import uvicorn

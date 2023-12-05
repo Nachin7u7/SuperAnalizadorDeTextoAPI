@@ -2,17 +2,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import time
 import pandas as pd
+from transformers import pipeline
+import spacy
 
 app = FastAPI()
-
 
 class SentimentInput(BaseModel):
     text: str
 
-
 class AnalysisInput(BaseModel):
     text: str
-
 
 models_info = {
     "sentiment": {"name": "Sentiment Analysis Model", "type": "NLP"},
@@ -21,45 +20,63 @@ models_info = {
 
 inference_reports = []
 
-
 @app.get("/status")
 def read_status():
     return {"service": "Running", "models": models_info}
 
-
 @app.post("/sentiment")
 def analyze_sentiment(input_data: SentimentInput):
     start_time = time.time()
-    sentiment_value = 0.5
+
+    sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+
+    result = sentiment_analyzer(input_data.text)
+    sentiment_value = result[0]['score']
+
     execution_time = time.time() - start_time
 
     response_data = {
         "sentiment_value": sentiment_value,
         "execution_time": execution_time,
-        "model_info": models_info["sentiment"],
+        "model_info": {"name": "Sentiment Analysis Model", "type": "NLP"},
     }
 
     inference_reports.append(response_data)
 
     return response_data
 
+nlp_model = spacy.load("en_core_web_sm")
 
 @app.post("/analysis")
 def analyze_text(input_data: AnalysisInput):
     start_time = time.time()
-    analysis_value = 0.7
+
+    doc = nlp_model(input_data.text)
+    pos_tags = [token.pos_ for token in doc]
+    ner_entities = [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
+
+    sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+    sentiment_result = sentiment_analyzer(input_data.text)
+    sentiment_value = sentiment_result[0]['score']
+
+    sentiment_category = "Positive" if sentiment_value > 0.7 else "Negative"
+    embedding = "Embedding data"
+
     execution_time = time.time() - start_time
 
     response_data = {
-        "analysis_value": analysis_value,
+        "pos_tags": pos_tags,
+        "ner_entities": ner_entities,
+        "sentiment_value": sentiment_value,
+        "sentiment_category": sentiment_category,
+        "embedding": embedding,
         "execution_time": execution_time,
-        "model_info": models_info["nlp"],
+        "model_info": {"name": "Combined Analysis Model", "type": "NLP"},
     }
 
     inference_reports.append(response_data)
 
     return response_data
-
 
 @app.get("/reports")
 def generate_reports():
@@ -70,37 +87,33 @@ def generate_reports():
 
     return {"csv_data": csv_data}
 
-
 class AnalysisV2Input(BaseModel):
     text: str
     prompt: str
 
+# @app.post("/analysis_v2")
+# def analyze_text_v2(input_data: AnalysisV2Input):
+#     start_time = time.time()
 
-@app.post("/analysis_v2")
-def analyze_text_v2(input_data: AnalysisV2Input):
-    start_time = time.time()
+#     pos_tags = ["NOUN", "VERB", "ADJ"]
+#     ner_entities = [{"text": "Apple", "label": "ORG"}]
+#     sentiment_prompt = 0.8
+#     lm_output = "Generated text from LLM"
+#     execution_time = time.time() - start_time
 
-    pos_tags = ["NOUN", "VERB", "ADJ"]
-    ner_entities = [{"text": "Apple", "label": "ORG"}]
-    sentiment_prompt = 0.8
-    lm_output = "Generated text from LLM"
-    execution_time = time.time() - start_time
+#     response_data = {
+#         "pos_tags": pos_tags,
+#         "ner_entities": ner_entities,
+#         "sentiment_prompt": sentiment_prompt,
+#         "lm_output": lm_output,
+#         "execution_time": execution_time,
+#         "model_info": {"name": "Combined Analysis Model", "type": "NLP"},
+#     }
 
-    response_data = {
-        "pos_tags": pos_tags,
-        "ner_entities": ner_entities,
-        "sentiment_prompt": sentiment_prompt,
-        "lm_output": lm_output,
-        "execution_time": execution_time,
-        "model_info": {"name": "Combined Analysis Model", "type": "NLP"},
-    }
+#     inference_reports.append(response_data)
 
-    inference_reports.append(response_data)
-
-    return response_data
-
+#     return response_data
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="127.0.0.1", port=8000)

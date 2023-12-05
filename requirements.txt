@@ -2,4 +2,9 @@ fastapi
 uvicorn
 pydantic
 spacy
+spaCy
 pandas
+transformers
+cargo
+rust
+torch
